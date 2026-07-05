@@ -1,0 +1,64 @@
+# ViT-Tiny on CIFAR-10 (32x32, 4x4 patches).
+# A strong-from-scratch recipe that reaches ~90%+ top-1 in ~100 epochs on a
+# single modern GPU. Tune batch_size / precision to your hardware.
+run_name: vit_tiny_cifar10
+tags: [cifar10, vit-tiny, baseline]
+
+model:
+  preset: vit_tiny        # embed_dim=192, depth=12, num_heads=3
+  image_size: 32
+  patch_size: 4
+  in_channels: 3
+  num_classes: 10
+  drop_rate: 0.0
+  attn_drop_rate: 0.0
+  drop_path_rate: 0.1
+  pool: cls
+
+data:
+  dataset: cifar10
+  data_dir: ./data
+  image_size: 32
+  batch_size: 128
+  num_workers: 4
+  val_split: 0.1
+  download: true
+  mean: [0.4914, 0.4822, 0.4465]
+  std: [0.2470, 0.2435, 0.2616]
+  random_crop_padding: 4
+  horizontal_flip: true
+  rand_augment: true
+  rand_augment_num_ops: 2
+  rand_augment_magnitude: 9
+  mixup_alpha: 0.2
+  cutmix_alpha: 1.0
+
+optim:
+  name: adamw
+  lr: 0.001
+  weight_decay: 0.05
+  betas: [0.9, 0.999]
+
+scheduler:
+  name: cosine
+  warmup_epochs: 5
+  min_lr: 0.00001
+  warmup_start_lr: 0.000001
+
+train:
+  epochs: 100
+  precision: fp16
+  grad_clip_norm: 1.0
+  accumulate_steps: 1
+  label_smoothing: 0.1
+  use_ema: true
+  ema_decay: 0.9999
+  log_interval: 50
+  output_dir: ./outputs
+  seed: 42
+  deterministic: false
+  compile_model: false
+  device: auto
+  checkpoint_metric: val_acc1
+  checkpoint_mode: max
+  early_stopping_patience: 0
