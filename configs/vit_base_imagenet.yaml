@@ -1,0 +1,56 @@
+# ViT-Base/16 on an ImageNet-style ImageFolder (224x224).
+# Expects data_dir/{train,val}/<class>/*.jpg. This is a large run intended for
+# multi-GPU; adjust batch_size, accumulate_steps, and epochs to your cluster.
+run_name: vit_base_imagenet
+tags: [imagenet, vit-base]
+
+model:
+  preset: vit_base        # embed_dim=768, depth=12, num_heads=12
+  image_size: 224
+  patch_size: 16
+  in_channels: 3
+  num_classes: 1000
+  drop_path_rate: 0.1
+  pool: cls
+
+data:
+  dataset: imagefolder
+  data_dir: ./data/imagenet
+  image_size: 224
+  batch_size: 256
+  num_workers: 8
+  download: false
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+  random_crop_padding: 0
+  horizontal_flip: true
+  rand_augment: true
+  rand_augment_num_ops: 2
+  rand_augment_magnitude: 9
+  mixup_alpha: 0.8
+  cutmix_alpha: 1.0
+
+optim:
+  name: adamw
+  lr: 0.003
+  weight_decay: 0.3
+
+scheduler:
+  name: cosine
+  warmup_epochs: 20
+  min_lr: 0.00001
+
+train:
+  epochs: 300
+  precision: bf16
+  grad_clip_norm: 1.0
+  accumulate_steps: 2
+  label_smoothing: 0.1
+  use_ema: true
+  ema_decay: 0.99996
+  output_dir: ./outputs
+  seed: 42
+  device: auto
+  compile_model: true
+  checkpoint_metric: val_acc1
+  checkpoint_mode: max
