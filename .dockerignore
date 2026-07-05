@@ -1,0 +1,48 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# ML artifacts (never bake data/checkpoints into images)
+data/
+runs/
+outputs/
+checkpoints/
+*.pt
+*.pth
+*.onnx
+wandb/
+mlruns/
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Docs & dev-only
+docs/
+tests/
+*.md
+!README.md
+.pre-commit-config.yaml
+.editorconfig
+
+# Secrets / local env
+.env
+.env.*
+!.env.example
