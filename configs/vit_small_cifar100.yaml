@@ -1,0 +1,50 @@
+# ViT-Small on CIFAR-100 (32x32, 4x4 patches).
+run_name: vit_small_cifar100
+tags: [cifar100, vit-small]
+
+model:
+  preset: vit_small       # embed_dim=384, depth=12, num_heads=6
+  image_size: 32
+  patch_size: 4
+  in_channels: 3
+  num_classes: 100
+  drop_path_rate: 0.1
+  pool: cls
+
+data:
+  dataset: cifar100
+  data_dir: ./data
+  image_size: 32
+  batch_size: 128
+  num_workers: 4
+  val_split: 0.1
+  download: true
+  mean: [0.5071, 0.4865, 0.4409]
+  std: [0.2673, 0.2564, 0.2762]
+  random_crop_padding: 4
+  horizontal_flip: true
+  rand_augment: true
+  mixup_alpha: 0.2
+  cutmix_alpha: 1.0
+
+optim:
+  name: adamw
+  lr: 0.001
+  weight_decay: 0.05
+
+scheduler:
+  name: cosine
+  warmup_epochs: 5
+  min_lr: 0.00001
+
+train:
+  epochs: 150
+  precision: fp16
+  grad_clip_norm: 1.0
+  label_smoothing: 0.1
+  use_ema: true
+  output_dir: ./outputs
+  seed: 42
+  device: auto
+  checkpoint_metric: val_acc1
+  checkpoint_mode: max
