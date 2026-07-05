@@ -1,0 +1,125 @@
+# Production Kubernetes manifests for the ViT inference service.
+# Apply with: kubectl apply -f deploy/k8s/
+#
+# Assumes a container image pushed to a registry and a checkpoint made
+# available via a PersistentVolumeClaim mounted at /models.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vit-config
+  labels: { app: vit-api }
+data:
+  VIT_MODEL_CHECKPOINT: "/models/best.pt"
+  VIT_DEVICE: "cpu"
+  VIT_LOG_JSON: "true"
+  VIT_RATE_LIMIT_RPM: "300"
+  VIT_ENABLE_METRICS: "true"
+  VIT_MAX_UPLOAD_BYTES: "5242880"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vit-api
+  labels: { app: vit-api }
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: vit-api }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels: { app: vit-api }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: vit-api
+          image: ghcr.io/your-org/build-your-own-vit:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 8080 }
+          envFrom:
+            - configMapRef: { name: vit-config }
+          # Optional bearer token for the predict endpoint, from a Secret.
+          env:
+            - name: VIT_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: vit-secrets
+                  key: api-token
+                  optional: true
+          resources:
+            requests: { cpu: "500m", memory: "1Gi" }
+            limits: { cpu: "2", memory: "2Gi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - { name: models, mountPath: /models, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: models
+          persistentVolumeClaim: { claimName: vit-models }
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vit-api
+  labels: { app: vit-api }
+spec:
+  selector: { app: vit-api }
+  ports:
+    - { name: http, port: 80, targetPort: http }
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: vit-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: vit-api
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vit-api
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels: { app: vit-api }
